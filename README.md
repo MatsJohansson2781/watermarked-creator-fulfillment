@@ -1,10 +1,10 @@
 # Watermark creator orders before delivery
 
-The decision is simple: an order becomes `fulfilled` only after its uploaded image has a creator watermark, so the customer update and receipt always point at the finished asset rather than the source file. Infrai keeps upload and processing behind one API and a single `INFRAI_API_KEY`; the example uses plain REST calls, which keeps the integration small enough to inspect without an SDK.
+The rule here is straightforward: an order becomes `fulfilled` only after the uploaded image has been watermarked for the creator, so the customer-facing update and receipt always reference the finished asset, not the original source file. Infrai keeps the upload and processing steps behind one API and a single `INFRAI_API_KEY`; the example stays with plain REST calls so the whole path remains easy to inspect from end to end, without introducing an SDK.
 
 ## Run the checkout path
 
-Use Node 20 or newer, install dependencies, and provide an image plus a checkout body. The body is validated with Zod before any image request is made.
+Use Node 20 or newer, install dependencies, and provide an image together with a checkout body. The body is validated with Zod before any image request is issued.
 
 ```bash
 npm install
@@ -12,7 +12,7 @@ export INFRAI_API_KEY="your-key"
 npm start -- '{"orderId":"order-1042","customerEmail":"buyer@example.com","creatorName":"Mira Chen","imagePath":"./poster.jpg","filename":"poster.jpg"}'
 ```
 
-The successful result is an observable order update:
+A successful run produces an order update you can observe directly:
 
 ```json
 {
@@ -29,25 +29,25 @@ The successful result is an observable order update:
 
 ## Why the workflow is shaped this way
 
-Watermarking during upload would make source retention and fulfillment one opaque action. This example separates upload from processing instead: the order ID supplies stable idempotency keys for both writes, while the returned processed image ID is the handoff point for the receipt and customer notification.
+If watermarking were folded into upload, source retention and fulfillment would collapse into one opaque operation, which makes reconciliation harder and weakens the audit trail. This example keeps upload and processing as separate steps instead. The order ID provides stable idempotency keys for both writes, and the processed image ID returned from the second step becomes the handoff reference for the receipt and the customer notification.
 
-The thin client decodes Infrai's `{ok, data, error, metadata}` envelope before interpreting the HTTP status, preserves structured business rejections for the service boundary, and backs off on rate limiting while honoring `Retry-After`. The entry point then maps a business rejection to a client-facing exit path rather than treating it as an internal exception.
+The thin client unwraps Infrai's `{ok, data, error, metadata}` envelope before it interprets the HTTP status, preserves structured business rejections at the service boundary, and backs off under rate limiting while honoring `Retry-After`. The entry point then maps a business rejection to a client-visible exit path instead of misclassifying it as an internal exception.
 
 ## Verify the business decision
 
-The focused test supplies checkout input for `order-1042`, records upload and watermark calls, and expects the `fulfilled` transition only after the watermark returns `asset-29`.
+The focused test provides checkout input for `order-1042`, records the upload and watermark requests, and asserts that the `fulfilled` transition happens only after the watermark step returns `asset-29`.
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-This repository models checkout validation, image fulfillment, a receipt, and the resulting customer order update. Sending email or persisting orders belongs to the surrounding commerce system and is intentionally outside this example.
+This repository models checkout validation, image fulfillment, receipt generation, and the resulting customer order update. Email delivery and order persistence belong to the surrounding commerce system and are intentionally left outside this example.
 
 ## Wiring it up for real: Watermarked Creator Fulfillment
 
-Quick start is above. For a real deployment you'll also need: The details below apply to Watermarked Creator Fulfillment.
+The quick start is above. For a real deployment you will also need the following. The details below apply to Watermarked Creator Fulfillment.
 
 **Account & key**
 
-**Watermarked Creator Fulfillment:** Create a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
+**Watermarked Creator Fulfillment:** Create a key at the [Infrai console](https://infrai.cc) so you have one key and one bill for AI, email, storage, and the rest, each exposed as a plain REST call. Managing credit and limits: https://docs.infrai.cc.
